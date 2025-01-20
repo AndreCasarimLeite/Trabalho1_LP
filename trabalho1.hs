@@ -5,15 +5,6 @@ import System.Random (randomRIO)
 
 type Estado = [Int]
 
--- Função para calcular o XOR
-xor :: Int -> Int -> Int
-xor 0 b = b
-xor a 0 = a
-xor a b
-    | even a && even b = 0
-    | odd a && odd b = 0
-    | otherwise = 1
-
 -- Gera um número ímpar aleatório entre 1 e 7
 geraPalitosAleatorios :: IO Int
 geraPalitosAleatorios = do
@@ -23,7 +14,7 @@ geraPalitosAleatorios = do
 -- Gera o estado inicial com um número aleatório de fileiras (>= 2)
 geraEstadoInicial :: IO Estado
 geraEstadoInicial = do
-    numFileiras <- randomRIO (2, 10 :: Int)
+    numFileiras <- randomRIO (2, 7 :: Int)
     mapM (\_ -> geraPalitosAleatorios) [1..numFileiras]
 
 -- Exibe o estado do jogo no terminal
@@ -54,27 +45,52 @@ jogadaJogador estado = do
 escolheLinhaAleatoria :: Estado -> IO Int
 escolheLinhaAleatoria estado = do
     let linhasValidas = [i | (i, n) <- zip [1..] estado, n > 0]
-    randomRIO (0, length linhasValidas - 1) >>= \idx -> return (linhasValidas !! idx)
+    idx <- randomRIO (0, length linhasValidas - 1)
+    return (linhasValidas !! idx)
+
 
 -- Jogada do computador no nível fácil: remove 1 palito da primeira fileira não vazia
 jogadaComputadorFacil :: Estado -> IO Estado
 jogadaComputadorFacil estado = do
-    fileira <- escolheLinhaAleatoria estado
-    return $ modificaEstado estado fileira 1
+    putStrLn "Vez do computador:"
+    linha <- escolheLinhaAleatoria estado
+    let maxPalitos = estado !! (linha - 1)
+    quantidade <- randomRIO (1, maxPalitos)
+    let novoEstado = modificaEstado estado linha quantidade
+    putStrLn $ "Computador escolheu a linha " ++ show linha ++ " e retirou " ++ show quantidade ++ " palito(s)."
+    return novoEstado
 
+xor :: Int -> Int -> Int
+xor x y = x `xor'` y
+  where
+    xor' 0 0 = 0
+    xor' 0 1 = 1
+    xor' 1 0 = 1
+    xor' 1 1 = 0
+    xor' a b = let (qa, ra) = a `divMod` 2
+                   (qb, rb) = b `divMod` 2
+               in (ra `xor'` rb) + 2 * (qa `xor'` qb)
 
 -- Jogada do computador no nível difícil: utiliza a estratégia vencedora
-jogadaComputadorDificil :: Estado -> IO Estado
-jogadaComputadorDificil estado = do
-    let xorTotal = foldr xor 0 estado
-    if xorTotal == 0
-        then jogadaComputadorFacil estado  -- Sem jogada perfeita, faz uma jogada fácil
+jogadaComputadorDificil :: [Int] -> IO [Int]
+jogadaComputadorDificil fileiras = do
+    putStrLn "Vez do computador:"
+    let somaBinaria = foldr1 xor fileiras
+    if somaBinaria == 0
+        then jogadaComputadorFacil fileiras -- Jogue qualquer coisa, pois não há estratégia vencedora no momento
         else do
-            let jogadasPossiveis = [(i, estado !! (i - 1) - (estado !! (i - 1) `xor` xorTotal))
-                                   | i <- [1..length estado], 
-                                     (estado !! (i - 1) `xor` xorTotal) < estado !! (i - 1)] -- calcula as jogadas posiveis
-            let (fileira, qtd) = head jogadasPossiveis
-            return $ modificaEstado estado fileira qtd
+            let (fileira, novaQuantidade) = encontrarJogadaEstrategica fileiras somaBinaria
+            let quantidadeRemovida = fileiras !! (fileira - 1) - novaQuantidade
+            let novaFileiras = modificaEstado fileiras fileira quantidadeRemovida
+            putStrLn $ "Computador removeu " ++ show quantidadeRemovida ++ " palito(s) da fileira " ++ show fileira
+            return novaFileiras
+
+-- Encontra a jogada estratégica que deixa a soma binária com todos os dígitos pares
+encontrarJogadaEstrategica :: [Int] -> Int -> (Int, Int)
+encontrarJogadaEstrategica fileiras somaBinaria =
+    head [(i + 1, novaQuantidade) | (i, quantidade) <- zip [0..] fileiras,
+                                    let novaQuantidade = quantidade `xor` somaBinaria,
+                                    novaQuantidade >= 0 && novaQuantidade <= quantidade]
 
 -- Loop principal do jogo
 jogo :: Estado -> Bool -> Int -> IO ()
