@@ -52,7 +52,6 @@ escolheLinhaAleatoria estado = do
 -- Jogada do computador no nível fácil: remove 1 palito da primeira fileira não vazia
 jogadaComputadorFacil :: Estado -> IO Estado
 jogadaComputadorFacil estado = do
-    putStrLn "Vez do computador:"
     linha <- escolheLinhaAleatoria estado
     let maxPalitos = estado !! (linha - 1)
     quantidade <- randomRIO (1, maxPalitos)
@@ -74,7 +73,6 @@ xor x y = x `xor'` y
 -- Jogada do computador no nível difícil: utiliza a estratégia vencedora
 jogadaComputadorDificil :: [Int] -> IO [Int]
 jogadaComputadorDificil fileiras = do
-    putStrLn "Vez do computador:"
     let somaBinaria = foldr1 xor fileiras
     if somaBinaria == 0
         then jogadaComputadorFacil fileiras -- Jogue qualquer coisa, pois não há estratégia vencedora no momento
@@ -101,7 +99,9 @@ jogo estado vezDoJogador nivel = do
         else do
             novoEstado <- if vezDoJogador
                           then jogadaJogador estado
-                          else if nivel == 1
+                          else do
+                            putStrLn "Vez do computador:"
+                            if nivel == 1
                                then jogadaComputadorFacil estado
                                else jogadaComputadorDificil estado
             jogo novoEstado (not vezDoJogador) nivel
